@@ -1,0 +1,60 @@
+{
+  "entities": {
+    "cafe": {
+      "title": "Cafe",
+      "description": "Information about the cafe and its owner",
+      "type": "object",
+      "properties": {
+        "ownerId": { "type": "string" },
+        "name": { "type": "string" },
+        "slug": { "type": "string" },
+        "description": { "type": "string" },
+        "logoUrl": { "type": "string", "format": "uri" },
+        "primaryColor": { "type": "string" },
+        "createdAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["ownerId", "name", "slug"]
+    },
+    "category": {
+      "title": "Category",
+      "description": "Menu categories like 'Coffee', 'Desserts'",
+      "type": "object",
+      "properties": {
+        "cafeId": { "type": "string" },
+        "name": { "type": "string" },
+        "order": { "type": "integer" }
+      },
+      "required": ["cafeId", "name", "order"]
+    },
+    "menuItem": {
+      "title": "Menu Item",
+      "description": "Specific items on the menu",
+      "type": "object",
+      "properties": {
+        "cafeId": { "type": "string" },
+        "categoryId": { "type": "string" },
+        "name": { "type": "string" },
+        "description": { "type": "string" },
+        "price": { "type": "number" },
+        "imageUrl": { "type": "string", "format": "uri" },
+        "isAvailable": { "type": "boolean" },
+        "order": { "type": "integer" }
+      },
+      "required": ["cafeId", "categoryId", "name", "price", "isAvailable", "order"]
+    }
+  },
+  "firestore": {
+    "cafes": {
+      "schema": "cafe",
+      "description": "List of all cafes"
+    },
+    "categories": {
+      "schema": "category",
+      "description": "Menu categories grouped by cafe"
+    },
+    "items": {
+      "schema": "menuItem",
+      "description": "Menu items grouped by category and cafe"
+    }
+  }
+}

@@ -1,0 +1,88 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // 0. Global Safety Net
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // --- Helpers ---
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(ownerId) {
+      return isSignedIn() && request.auth.uid == ownerId;
+    }
+
+    function isValidId(id) {
+      return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+    
+    // --- Validation Helpers ---
+    
+    function isValidCafe(data) {
+      return data.keys().hasAll(['ownerId', 'name', 'slug']) &&
+             data.ownerId == request.auth.uid &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.slug is string && data.slug.size() > 0 && data.slug.size() <= 50 &&
+             data.slug.matches('^[a-z0-9-]+$');
+    }
+
+    function isValidCategory(data) {
+      return data.keys().hasAll(['cafeId', 'name', 'order']) &&
+             data.cafeId is string &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.order is int;
+    }
+
+    function isValidMenuItem(data) {
+      return data.keys().hasAll(['cafeId', 'categoryId', 'name', 'price', 'isAvailable', 'order']) &&
+             data.cafeId is string &&
+             data.categoryId is string &&
+             data.name is string && data.name.size() > 0 && data.name.size() <= 100 &&
+             data.price is number && data.price >= 0 &&
+             data.isAvailable is bool &&
+             data.order is int;
+    }
+
+    // --- Rules ---
+
+    // Cafes
+    match /cafes/{cafeId} {
+      allow read: if true; // Publicly readable for the menu page
+      allow create: if isSignedIn() && isValidCafe(incoming());
+      allow update: if isSignedIn() && isOwner(existing().ownerId) && isValidCafe(incoming()) &&
+                    incoming().ownerId == existing().ownerId &&
+                    incoming().slug == existing().slug; // Slug is immutable for now
+      allow delete: if isSignedIn() && isOwner(existing().ownerId);
+    }
+
+    // Categories
+    match /categories/{catId} {
+      allow read: if true;
+      allow create: if isSignedIn() && get(/databases/$(database)/documents/cafes/$(incoming().cafeId)).data.ownerId == request.auth.uid && isValidCategory(incoming());
+      allow update: if isSignedIn() && get(/databases/$(database)/documents/cafes/$(existing().cafeId)).data.ownerId == request.auth.uid && isValidCategory(incoming()) &&
+                    incoming().cafeId == existing().cafeId;
+      allow delete: if isSignedIn() && get(/databases/$(database)/documents/cafes/$(existing().cafeId)).data.ownerId == request.auth.uid;
+    }
+
+    // Items
+    match /items/{itemId} {
+      allow read: if true;
+      allow create: if isSignedIn() && get(/databases/$(database)/documents/cafes/$(incoming().cafeId)).data.ownerId == request.auth.uid && isValidMenuItem(incoming());
+      allow update: if isSignedIn() && get(/databases/$(database)/documents/cafes/$(existing().cafeId)).data.ownerId == request.auth.uid && isValidMenuItem(incoming()) &&
+                    incoming().cafeId == existing().cafeId &&
+                    incoming().categoryId == existing().categoryId;
+      allow delete: if isSignedIn() && get(/databases/$(database)/documents/cafes/$(existing().cafeId)).data.ownerId == request.auth.uid;
+    }
+  }
+}
