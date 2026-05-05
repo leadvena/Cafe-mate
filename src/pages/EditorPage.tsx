@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
-import { motion, Reorder, AnimatePresence } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { ArrowLeft, Plus, Trash2, Camera, ChevronRight, Coffee, Image as ImageIcon, GripVertical, Check, RefreshCcw, Layout, FileText, Upload, Sparkles, Loader2 } from 'lucide-react';
+import { ArrowLeft, Plus, Trash2, Camera, ChevronRight, Check, RefreshCcw, Layout, Upload, Sparkles, Loader2, Edit2, X, Image as ImageIcon } from 'lucide-react';
 import { db, auth, handleFirestoreError, OperationType } from '../services/firebase';
 import { collection, query, where, onSnapshot, doc, addDoc, updateDoc, deleteDoc, orderBy, writeBatch } from 'firebase/firestore';
 import { Cafe, Category, MenuItem } from '../types';
@@ -16,6 +16,10 @@ export default function EditorPage() {
   const [items, setItems] = useState<MenuItem[]>([]);
   const [isSaving, setIsSaving] = useState(false);
   const fileInputRef = React.useRef<HTMLInputElement>(null);
+
+  // Modal State
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
   const handleBulkImport = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -45,10 +49,8 @@ export default function EditorPage() {
           });
         }
 
-        // Process imports
         const batch = writeBatch(db);
         for (const item of importedItems) {
-          // Find or create category
           let categoryId = activeCategoryId;
           if (item.category) {
             const existingCat = categories.find(c => c.name.toLowerCase() === item.category.toLowerCase());
@@ -74,7 +76,7 @@ export default function EditorPage() {
             description: item.description || '',
             price: parseFloat(item.price) || 0,
             isAvailable: true,
-            order: 999 // Let them reorder later
+            order: 999 
           });
         }
 
@@ -90,7 +92,6 @@ export default function EditorPage() {
     reader.readAsText(file);
   };
 
-  // Load Cafe
   useEffect(() => {
     const unsubscribeAuth = auth.onAuthStateChanged((user) => {
       if (!user) {
@@ -109,7 +110,6 @@ export default function EditorPage() {
     return () => unsubscribeAuth();
   }, [navigate]);
 
-  // Load Categories
   useEffect(() => {
     if (!cafe) return;
     const qCats = query(collection(db, 'categories'), where('cafeId', '==', cafe.id), orderBy('order', 'asc'));
@@ -123,7 +123,6 @@ export default function EditorPage() {
     return () => unsubscribe();
   }, [cafe]);
 
-  // Load Items for active category
   useEffect(() => {
     if (!activeCategoryId) return;
     const qItems = query(collection(db, 'items'), where('categoryId', '==', activeCategoryId), orderBy('order', 'asc'));
@@ -151,38 +150,6 @@ export default function EditorPage() {
     }
   };
 
-  const addItem = async () => {
-    if (!activeCategoryId || !cafe) return;
-    setIsSaving(true);
-    try {
-      const newItem = {
-        cafeId: cafe.id,
-        categoryId: activeCategoryId,
-        name: 'New Item',
-        description: 'Describe your item...',
-        price: 0,
-        isAvailable: true,
-        order: items.length
-      };
-      await addDoc(collection(db, 'items'), newItem);
-    } catch (e) {
-      handleFirestoreError(e, OperationType.CREATE, 'items');
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
-  const updateItem = async (id: string, updates: Partial<MenuItem>) => {
-    setIsSaving(true);
-    try {
-      await updateDoc(doc(db, 'items', id), updates);
-    } catch (e) {
-      handleFirestoreError(e, OperationType.UPDATE, `items/${id}`);
-    } finally {
-      setIsSaving(false);
-    }
-  };
-
   const deleteItem = async (id: string) => {
     if (!confirm('Are you sure you want to delete this item?')) return;
     try {
@@ -192,19 +159,48 @@ export default function EditorPage() {
     }
   };
 
-  const handleReorder = async (newItems: MenuItem[]) => {
-    setItems(newItems);
-    const batch = writeBatch(db);
-    newItems.forEach((item, index) => {
-      const ref = doc(db, 'items', item.id);
-      batch.update(ref, { order: index });
-    });
-    await batch.commit();
+  const openAddModal = () => {
+    setEditingItem(null);
+    setIsModalOpen(true);
+  };
+
+  const openEditModal = (item: MenuItem) => {
+    setEditingItem(item);
+    setIsModalOpen(true);
+  };
+
+  const closeModal = () => {
+    setIsModalOpen(false);
+    setEditingItem(null);
+  };
+
+  const saveProduct = async (productData: Partial<MenuItem>) => {
+    if (!activeCategoryId || !cafe) return;
+    setIsSaving(true);
+    
+    try {
+      if (editingItem) {
+        // Update
+        await updateDoc(doc(db, 'items', editingItem.id), productData);
+      } else {
+        // Create
+        await addDoc(collection(db, 'items'), {
+          ...productData,
+          cafeId: cafe.id,
+          categoryId: activeCategoryId,
+          order: items.length
+        });
+      }
+      closeModal();
+    } catch (e) {
+      handleFirestoreError(e, editingItem ? OperationType.UPDATE : OperationType.CREATE, 'items');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
     <div className="h-screen bg-cream flex flex-col overflow-hidden font-sans">
-      {/* Editorial Header */}
       <header className="px-8 py-6 bg-cream/80 backdrop-blur-xl border-b border-brown-dark/5 flex justify-between items-center z-40">
         <div className="flex items-center gap-8">
           <button 
@@ -223,7 +219,7 @@ export default function EditorPage() {
                     <Check className="w-3.5 h-3.5 text-green-accent" />
                   )}
                   <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brown-dark/40">
-                    {isSaving ? 'Curation in progress' : 'Workspace Synchronized'}
+                    {isSaving ? 'Saving Changes' : 'Workspace Synchronized'}
                   </span>
                </div>
             </div>
@@ -255,7 +251,6 @@ export default function EditorPage() {
       </header>
 
       <div className="flex-1 flex overflow-hidden">
-        {/* Category Rails */}
         <aside className="w-80 bg-white/50 border-r border-brown-dark/5 flex flex-col overflow-hidden">
           <div className="p-10 shrink-0 flex justify-between items-center">
             <h2 className="text-[11px] font-bold text-brown-dark/30 uppercase tracking-[0.3em]">Collections</h2>
@@ -285,8 +280,7 @@ export default function EditorPage() {
           </div>
         </aside>
 
-        {/* Curation Area */}
-        <main className="flex-1 overflow-y-auto p-16 no-scrollbar bg-cream/20">
+        <main className="flex-1 overflow-y-auto p-12 no-scrollbar bg-cream/20">
            <AnimatePresence mode="wait">
              {activeCategoryId ? (
                <motion.div 
@@ -294,9 +288,9 @@ export default function EditorPage() {
                  initial={{ opacity: 0, y: 30 }}
                  animate={{ opacity: 1, y: 0 }}
                  exit={{ opacity: 0, y: -30 }}
-                 className="max-w-4xl mx-auto pb-40"
+                 className="max-w-6xl mx-auto pb-40"
                >
-                  <div className="mb-20 flex justify-between items-end">
+                  <div className="mb-12 flex justify-between items-end">
                      <div className="flex-1">
                         <input 
                           type="text"
@@ -306,43 +300,89 @@ export default function EditorPage() {
                             if (!newName) return;
                             updateDoc(doc(db, 'categories', activeCategoryId), { name: newName });
                           }}
-                          className="text-7xl font-serif bg-transparent border-none focus:outline-none focus:ring-0 w-full text-brown-dark tracking-tighter"
+                          className="text-5xl font-serif bg-transparent border-none focus:outline-none focus:ring-0 w-full text-brown-dark tracking-tighter"
                         />
-                        <p className="text-sm text-brown-dark/30 mt-4 font-medium uppercase tracking-widest">Editing Collection — {items.length} Items</p>
+                        <p className="text-sm text-brown-dark/30 mt-2 font-medium uppercase tracking-widest">{items.length} Products in Collection</p>
                      </div>
-                     <div className="flex gap-4 mb-4">
-                        <button className="w-12 h-12 rounded-full border border-brown-dark/5 bg-white flex items-center justify-center text-brown-dark/40 hover:text-brown-dark transition-all">
-                           <Sparkles className="w-5 h-5" />
+                     <div>
+                        <button 
+                          onClick={openAddModal}
+                          className="btn-primary py-3 px-6 shadow-xl shadow-brown-dark/20 flex items-center gap-2"
+                        >
+                           <Plus className="w-5 h-5" />
+                           Add Product
                         </button>
                      </div>
                   </div>
 
-                  <Reorder.Group axis="y" values={items} onReorder={handleReorder} className="space-y-8">
-                    {items.map((item) => (
-                      <Reorder.Item key={item.id} value={item}>
-                        <ItemCard 
-                          item={item} 
-                          onUpdate={(updates) => updateItem(item.id, updates)} 
-                          onDelete={() => deleteItem(item.id)}
-                        />
-                      </Reorder.Item>
-                    ))}
-                  </Reorder.Group>
-                   
-                  <motion.button 
-                    whileHover={{ scale: 1.01 }}
-                    whileTap={{ scale: 0.99 }}
-                    onClick={addItem}
-                    className="w-full mt-16 py-16 border-2 border-dashed border-brown-dark/10 rounded-[4rem] flex flex-col items-center justify-center gap-6 text-brown-dark/30 hover:border-brown-dark/20 hover:text-brown-dark hover:bg-white transition-all group bg-white/30"
-                  >
-                    <div className="w-16 h-16 rounded-full bg-brown-dark/5 flex items-center justify-center group-hover:scale-110 transition-transform shadow-sm">
-                      <Plus className="w-8 h-8" />
-                    </div>
-                    <div className="text-center">
-                      <span className="font-bold text-sm tracking-[0.2em] uppercase block mb-1">Add New Item</span>
-                      <span className="text-[10px] text-brown-dark/20 uppercase font-bold tracking-widest">or drag & drop images here</span>
-                    </div>
-                  </motion.button>
+                  <div className="bg-white rounded-3xl shadow-sm border border-brown-dark/5 overflow-hidden">
+                     <table className="w-full text-left">
+                       <thead className="bg-brown-dark/5 text-[10px] uppercase font-bold tracking-widest text-brown-dark/40 border-b border-brown-dark/5">
+                         <tr>
+                           <th className="px-8 py-5 w-24">Image</th>
+                           <th className="px-8 py-5">Product Details</th>
+                           <th className="px-8 py-5 w-32 text-right">Price</th>
+                           <th className="px-8 py-5 w-40 text-center">Status</th>
+                           <th className="px-8 py-5 w-32 text-right">Actions</th>
+                         </tr>
+                       </thead>
+                       <tbody className="divide-y divide-brown-dark/5">
+                         {items.length === 0 ? (
+                           <tr>
+                             <td colSpan={5} className="py-20 text-center">
+                               <p className="text-text-muted mb-4">No products in this collection yet.</p>
+                               <button onClick={openAddModal} className="text-brown-dark font-bold hover:underline">Add your first product</button>
+                             </td>
+                           </tr>
+                         ) : (
+                           items.map((item) => (
+                             <tr key={item.id} className="group hover:bg-brown-dark/[0.02] transition-colors">
+                               <td className="px-8 py-4">
+                                 <div className="w-16 h-16 rounded-xl bg-cream border border-brown-dark/5 overflow-hidden flex items-center justify-center">
+                                   {item.imageUrl ? (
+                                     <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover" />
+                                   ) : (
+                                     <ImageIcon className="w-6 h-6 text-brown-dark/20" />
+                                   )}
+                                 </div>
+                               </td>
+                               <td className="px-8 py-4">
+                                 <p className="font-serif text-lg text-brown-dark tracking-tight">{item.name}</p>
+                                 <p className="text-xs text-text-muted mt-1 truncate max-w-sm">{item.description || 'No description'}</p>
+                               </td>
+                               <td className="px-8 py-4 text-right">
+                                 <span className="font-bold text-brown-dark">₱{item.price.toFixed(2)}</span>
+                               </td>
+                               <td className="px-8 py-4 text-center">
+                                 <span className={cn(
+                                   "inline-flex items-center px-3 py-1 rounded-full text-[10px] font-bold uppercase tracking-widest",
+                                   item.isAvailable ? "bg-green-accent/20 text-green-accent" : "bg-brown-dark/10 text-brown-dark/40"
+                                 )}>
+                                   {item.isAvailable ? 'Available' : 'Sold Out'}
+                                 </span>
+                               </td>
+                               <td className="px-8 py-4 text-right">
+                                 <div className="flex items-center justify-end gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                   <button 
+                                     onClick={() => openEditModal(item)}
+                                     className="w-10 h-10 rounded-xl bg-white border border-brown-dark/10 flex items-center justify-center text-brown-dark hover:bg-brown-dark hover:text-white transition-all shadow-sm"
+                                   >
+                                     <Edit2 className="w-4 h-4" />
+                                   </button>
+                                   <button 
+                                     onClick={() => deleteItem(item.id)}
+                                     className="w-10 h-10 rounded-xl bg-white border border-brown-dark/10 flex items-center justify-center text-brown-dark/40 hover:bg-red-500 hover:text-white hover:border-red-500 transition-all shadow-sm"
+                                   >
+                                     <Trash2 className="w-4 h-4" />
+                                   </button>
+                                 </div>
+                               </td>
+                             </tr>
+                           ))
+                         )}
+                       </tbody>
+                     </table>
+                  </div>
                </motion.div>
              ) : (
                <div className="h-full flex flex-col items-center justify-center text-center">
@@ -356,128 +396,177 @@ export default function EditorPage() {
            </AnimatePresence>
         </main>
       </div>
+
+      {/* Product Modal */}
+      <AnimatePresence>
+        {isModalOpen && (
+          <ProductModal 
+            item={editingItem} 
+            onClose={closeModal} 
+            onSave={saveProduct} 
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }
 
-function ItemCard({ item, onUpdate, onDelete }: { item: MenuItem; onUpdate: (u: Partial<MenuItem>) => void; onDelete: () => void }) {
-   const [localItem, setLocalItem] = useState(item);
-   const [isUploading, setIsUploading] = useState(false);
-   const imageInputRef = React.useRef<HTMLInputElement>(null);
+// ----------------------------------------------------
+// PRODUCT MODAL COMPONENT
+// ----------------------------------------------------
+function ProductModal({ item, onClose, onSave }: { item: MenuItem | null; onClose: () => void; onSave: (data: Partial<MenuItem>) => void }) {
+  const [formData, setFormData] = useState({
+    name: item?.name || '',
+    description: item?.description || '',
+    price: item?.price || 0,
+    isAvailable: item?.isAvailable ?? true,
+    imageUrl: item?.imageUrl || ''
+  });
+  const [isUploading, setIsUploading] = useState(false);
+  const imageInputRef = React.useRef<HTMLInputElement>(null);
 
-   const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-     const file = e.target.files?.[0];
-     if (!file) return;
+  const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
 
-     setIsUploading(true);
-     try {
-       const url = await uploadMenuItemImage(file);
-       onUpdate({ imageUrl: url });
-     } catch (err) {
-       console.error('Upload failed:', err);
-       alert('Image upload failed. Please try again.');
-     } finally {
-       setIsUploading(false);
-     }
-   };
+    setIsUploading(true);
+    try {
+      const url = await uploadMenuItemImage(file);
+      setFormData(prev => ({ ...prev, imageUrl: url }));
+    } catch (err) {
+      console.error('Upload failed:', err);
+      alert('Image upload failed. Please try again.');
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
-   return (
-     <div className="card-tactile p-8 bg-white flex gap-10 items-start group shadow-lg hover:shadow-2xl transition-all duration-700">
-        <div className="w-40 h-40 shrink-0 bg-cream rounded-[2.5rem] flex flex-col items-center justify-center border border-brown-dark/5 relative overflow-hidden group/img shadow-inner">
-           {isUploading ? (
-             <div className="flex flex-col items-center gap-3">
-                <Loader2 className="w-8 h-8 text-brown-dark/20 animate-spin" />
-                <span className="text-[9px] uppercase font-bold tracking-[0.2em] text-brown-dark/20">Uploading...</span>
-             </div>
-           ) : item.imageUrl ? (
-             <img src={item.imageUrl} alt={item.name} className="w-full h-full object-cover transition-transform duration-1000 group-hover/img:scale-110" referrerPolicy="no-referrer" />
-           ) : (
-             <div className="flex flex-col items-center text-brown-dark/20">
-                <ImageIcon className="w-10 h-10 mb-3" />
-                <span className="text-[9px] uppercase font-bold tracking-[0.2em]">Upload Photo</span>
-             </div>
-           )}
-           <div className="absolute inset-0 bg-brown-dark/70 opacity-0 group-hover/img:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
-              <input 
-                type="file" 
-                ref={imageInputRef} 
-                onChange={handleImageUpload} 
-                className="hidden" 
-                accept="image/*"
-              />
-              <button 
-                onClick={() => imageInputRef.current?.click()}
-                className="text-white hover:scale-110 transition-transform bg-white/20 p-4 rounded-full"
-              >
-                 <Camera className="w-8 h-8" />
-              </button>
-           </div>
-        </div>
+  return (
+    <motion.div 
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      exit={{ opacity: 0 }}
+      className="fixed inset-0 z-50 flex items-center justify-center bg-brown-dark/80 backdrop-blur-sm p-6"
+    >
+      <motion.div 
+        initial={{ scale: 0.95, opacity: 0, y: 20 }}
+        animate={{ scale: 1, opacity: 1, y: 0 }}
+        exit={{ scale: 0.95, opacity: 0, y: 20 }}
+        className="w-full max-w-2xl bg-cream rounded-[3rem] overflow-hidden shadow-2xl relative"
+      >
+        <button 
+          onClick={onClose}
+          className="absolute top-8 right-8 w-10 h-10 bg-white rounded-full flex items-center justify-center text-brown-dark hover:bg-brown-dark hover:text-white transition-all z-10"
+        >
+          <X className="w-5 h-5" />
+        </button>
 
-       <div className="flex-1 min-w-0 pt-2">
-          <div className="flex justify-between items-start mb-8">
-             <div className="flex-1 mr-8">
-                <input 
-                  type="text"
-                  value={localItem.name}
-                  onChange={(e) => setLocalItem({...localItem, name: e.target.value})}
-                  onBlur={() => onUpdate({ name: localItem.name })}
-                  className="text-3xl font-serif text-brown-dark bg-transparent border-none focus:outline-none w-full p-0 leading-none mb-2 tracking-tight"
-                />
-                <div className="h-[2px] w-0 group-hover:w-full bg-green-accent opacity-30 transition-all duration-1000" />
-             </div>
-             <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3 bg-cream px-5 py-3 rounded-2xl border border-brown-dark/5 shadow-inner">
-                   <span className="text-[10px] font-bold text-brown-dark/30 uppercase tracking-widest">PHP</span>
-                   <input 
-                     type="number"
-                     value={localItem.price}
-                     onChange={(e) => setLocalItem({...localItem, price: parseFloat(e.target.value) || 0})}
-                     onBlur={() => onUpdate({ price: localItem.price })}
-                     className="w-20 bg-transparent border-none focus:outline-none text-base font-bold text-brown-dark text-right tabular-nums"
-                   />
+        <div className="p-12">
+          <h2 className="text-4xl font-serif text-brown-dark mb-8 tracking-tight">
+            {item ? 'Edit Product' : 'New Product'}
+          </h2>
+
+          <div className="space-y-6">
+            <div className="flex gap-8">
+              {/* Image Uploader */}
+              <div className="w-48 h-48 shrink-0 bg-white rounded-[2rem] border-2 border-dashed border-brown-dark/10 flex flex-col items-center justify-center relative overflow-hidden group">
+                {isUploading ? (
+                  <div className="flex flex-col items-center gap-3">
+                    <Loader2 className="w-8 h-8 text-brown-dark/20 animate-spin" />
+                  </div>
+                ) : formData.imageUrl ? (
+                  <img src={formData.imageUrl} alt="Preview" className="w-full h-full object-cover" />
+                ) : (
+                  <div className="flex flex-col items-center text-brown-dark/20">
+                    <ImageIcon className="w-8 h-8 mb-2" />
+                    <span className="text-[10px] uppercase font-bold tracking-[0.2em]">Add Photo</span>
+                  </div>
+                )}
+                
+                <div className="absolute inset-0 bg-brown-dark/70 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center backdrop-blur-sm">
+                  <input 
+                    type="file" 
+                    ref={imageInputRef} 
+                    onChange={handleImageUpload} 
+                    className="hidden" 
+                    accept="image/*"
+                  />
+                  <button 
+                    onClick={() => imageInputRef.current?.click()}
+                    className="text-white bg-white/20 p-4 rounded-full hover:scale-110 transition-transform"
+                  >
+                    <Camera className="w-6 h-6" />
+                  </button>
                 </div>
-                <button 
-                  onClick={onDelete}
-                  className="w-12 h-12 rounded-2xl bg-brown-dark/5 text-brown-dark/20 hover:text-red-500 hover:bg-red-500/10 transition-all flex items-center justify-center shadow-sm"
-                >
-                   <Trash2 className="w-5 h-5" />
-                </button>
-             </div>
-          </div>
+              </div>
 
-          <textarea 
-             value={localItem.description}
-             onChange={(e) => setLocalItem({...localItem, description: e.target.value})}
-             onBlur={() => onUpdate({ description: localItem.description })}
-             className="w-full bg-transparent border-none p-0 text-base text-text-muted focus:ring-0 h-16 resize-none leading-relaxed font-light"
-             placeholder="Describe the essence of this item..."
-          />
+              {/* Core Details */}
+              <div className="flex-1 space-y-6">
+                <div>
+                  <label className="text-[10px] uppercase font-bold tracking-widest text-brown-dark/40 block mb-2 ml-2">Product Name</label>
+                  <input 
+                    type="text"
+                    value={formData.name}
+                    onChange={e => setFormData({...formData, name: e.target.value})}
+                    placeholder="e.g. Pour Over Coffee"
+                    className="input-field"
+                    autoFocus
+                  />
+                </div>
+                <div>
+                  <label className="text-[10px] uppercase font-bold tracking-widest text-brown-dark/40 block mb-2 ml-2">Price (PHP)</label>
+                  <input 
+                    type="number"
+                    value={formData.price || ''}
+                    onChange={e => setFormData({...formData, price: parseFloat(e.target.value) || 0})}
+                    placeholder="0.00"
+                    className="input-field font-bold tabular-nums"
+                  />
+                </div>
+              </div>
+            </div>
 
-          <div className="flex items-center justify-between mt-10">
-             <div className="flex items-center gap-5">
+            <div>
+              <label className="text-[10px] uppercase font-bold tracking-widest text-brown-dark/40 block mb-2 ml-2">Description</label>
+              <textarea 
+                value={formData.description}
+                onChange={e => setFormData({...formData, description: e.target.value})}
+                placeholder="Describe the flavor profile, ingredients, or origin..."
+                className="input-field min-h-[100px] resize-none py-4 leading-relaxed"
+              />
+            </div>
+
+            <div className="flex items-center justify-between pt-4 border-t border-brown-dark/5">
+              <div className="flex items-center gap-4">
                 <div 
-                  onClick={() => onUpdate({ isAvailable: !item.isAvailable })}
+                  onClick={() => setFormData({...formData, isAvailable: !formData.isAvailable})}
                   className={cn(
                     "w-14 h-7 rounded-full relative transition-all cursor-pointer p-1.5 shadow-inner",
-                    item.isAvailable ? "bg-green-accent" : "bg-brown-dark/10"
+                    formData.isAvailable ? "bg-green-accent" : "bg-brown-dark/10"
                   )}
                 >
-                   <div className={cn(
-                     "w-4 h-4 bg-white rounded-full transition-all shadow-md",
-                     item.isAvailable ? "translate-x-7" : "translate-x-0"
-                   )} />
+                  <div className={cn(
+                    "w-4 h-4 bg-white rounded-full transition-all shadow-md",
+                    formData.isAvailable ? "translate-x-7" : "translate-x-0"
+                  )} />
                 </div>
-                <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brown-dark/40">
-                   {item.isAvailable ? 'Currently Serving' : 'Temporarily Out'}
-                </span>
-             </div>
-             
-             <div className="cursor-grab active:cursor-grabbing text-brown-dark/5 hover:text-brown-dark/30 transition-all p-2">
-                <GripVertical className="w-7 h-7" />
-             </div>
+                <div>
+                  <p className="text-sm font-bold text-brown-dark tracking-tight">Available to Order</p>
+                  <p className="text-[10px] text-text-muted">Turn off if item is out of stock</p>
+                </div>
+              </div>
+
+              <button 
+                onClick={() => onSave(formData)}
+                disabled={!formData.name}
+                className="btn-primary px-10 py-4 shadow-xl shadow-brown-dark/20 disabled:opacity-50"
+              >
+                Save Product
+              </button>
+            </div>
           </div>
-       </div>
-    </div>
+        </div>
+      </motion.div>
+    </motion.div>
   );
 }
