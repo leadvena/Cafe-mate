@@ -5,15 +5,19 @@ import { Edit3, Share2, Download, ExternalLink, Coffee, LogOut, Layout, ArrowRig
 import { auth, logOut } from '../services/firebase';
 import { useState, useEffect } from 'react';
 import { db } from '../services/firebase';
-import { collection, query, where, onSnapshot } from 'firebase/firestore';
+import { collection, query, where, onSnapshot, addDoc, doc, updateDoc } from 'firebase/firestore';
 import { Cafe } from '../types';
 import { cn } from '../lib/utils';
+import UpgradeModal from '../components/UpgradeModal';
+import { sendUpgradeRequestEmail } from '../services/email';
 
 export default function DashboardPage() {
   const navigate = useNavigate();
   const [cafe, setCafe] = useState<Cafe | null>(null);
   const [loading, setLoading] = useState(true);
   const [copySuccess, setCopySuccess] = useState(false);
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [isSubmittingUpgrade, setIsSubmittingUpgrade] = useState(false);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -63,6 +67,36 @@ export default function DashboardPage() {
     navigator.clipboard.writeText(shareUrl);
     setCopySuccess(true);
     setTimeout(() => setCopySuccess(false), 2000);
+  };
+
+  const handleUpgradeSubmit = async (referenceNumber: string) => {
+    if (!cafe) return;
+    setIsSubmittingUpgrade(true);
+    try {
+      // Save request to Firestore
+      await addDoc(collection(db, 'upgrade_requests'), {
+        cafeId: cafe.id,
+        cafeName: cafe.name,
+        referenceNumber,
+        status: 'pending',
+        createdAt: new Date().toISOString()
+      });
+
+      // Update cafe document to show pending status
+      const cafeRef = doc(db, 'cafes', cafe.id);
+      await updateDoc(cafeRef, { upgradePending: true });
+
+      // Trigger the backend email notification to the admin
+      await sendUpgradeRequestEmail(cafe.name, referenceNumber);
+
+      setIsUpgradeModalOpen(false);
+      alert('Payment submitted! We are verifying your transaction. Your account will be upgraded shortly.');
+    } catch (e) {
+      console.error('Upgrade request failed', e);
+      alert('Something went wrong. Please try again.');
+    } finally {
+      setIsSubmittingUpgrade(false);
+    }
   };
 
   if (loading) return null;
@@ -193,6 +227,38 @@ export default function DashboardPage() {
                   </div>
                 </div>
               </div>
+
+              {/* Pro Status Block */}
+              <div className={cn(
+                "card-tactile p-8 relative overflow-hidden flex flex-col md:flex-row items-start md:items-center justify-between gap-6",
+                (cafe as any)?.isPremium ? "bg-green-accent/10 border-green-accent/20" : 
+                (cafe as any)?.upgradePending ? "bg-yellow-500/10 border-yellow-500/20" : "bg-brown-dark/5"
+              )}>
+                 <div>
+                    <h3 className="text-xl font-serif text-brown-dark mb-1">
+                      {(cafe as any)?.isPremium ? 'The Roastery Plan' : (cafe as any)?.upgradePending ? 'Upgrade Processing' : 'The Soloist Plan'}
+                    </h3>
+                    <p className="text-sm text-text-muted">
+                      {(cafe as any)?.isPremium ? 'Unlimited menu items & priority support active.' : 
+                       (cafe as any)?.upgradePending ? 'Verifying GCash payment. This usually takes a few hours.' : 
+                       'Limited to 10 menu items.'}
+                    </p>
+                 </div>
+                 {!(cafe as any)?.isPremium && !(cafe as any)?.upgradePending && (
+                   <button 
+                    onClick={() => setIsUpgradeModalOpen(true)}
+                    className="btn-primary px-8 py-3 whitespace-nowrap shadow-xl shadow-brown-dark/20"
+                   >
+                     Upgrade to Pro
+                   </button>
+                 )}
+                 {(cafe as any)?.isPremium && (
+                   <div className="px-4 py-2 bg-green-accent/20 text-green-accent rounded-full text-xs font-bold uppercase tracking-widest flex items-center gap-2">
+                     <CheckCircle2 className="w-4 h-4" />
+                     Active
+                   </div>
+                 )}
+              </div>
            </div>
 
            {/* Preview Column */}
@@ -238,6 +304,13 @@ export default function DashboardPage() {
            </div>
         </section>
       </main>
+
+      <UpgradeModal 
+        isOpen={isUpgradeModalOpen} 
+        onClose={() => setIsUpgradeModalOpen(false)} 
+        onSubmit={handleUpgradeSubmit}
+        isSubmitting={isSubmittingUpgrade}
+      />
     </div>
   );
 }

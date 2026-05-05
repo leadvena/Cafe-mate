@@ -297,7 +297,11 @@ export default function LandingPage() {
                   <p className="text-cream/40 text-sm uppercase tracking-widest font-bold">For expanding brands</p>
                 </div>
                 <div className="text-right">
-                  <div className="text-4xl font-serif">₱1,499</div>
+                  <div className="flex items-end gap-3 justify-end">
+                     <span className="text-4xl font-serif">₱599</span>
+                     <span className="text-lg text-cream/30 line-through mb-1">₱1,499</span>
+                  </div>
+                  <div className="text-[10px] uppercase font-bold text-green-accent mt-1">Special Early Access</div>
                   <div className="text-[10px] uppercase font-bold text-cream/40">per month</div>
                 </div>
               </div>
