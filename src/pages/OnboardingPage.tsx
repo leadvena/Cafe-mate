@@ -1,10 +1,14 @@
 import React, { useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
-import { Coffee, ArrowRight, Check, MapPin, Palette, Sparkles } from 'lucide-react';
+import { Coffee, ArrowRight, Check, MapPin, Palette, Sparkles, Loader2 } from 'lucide-react';
+import { db, auth } from '../services/firebase';
+import { collection, addDoc } from 'firebase/firestore';
+import { sendWelcomeEmail } from '../services/email';
 
 export default function OnboardingPage() {
   const [step, setStep] = useState(1);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [formData, setFormData] = useState({
     name: '',
     location: '',
@@ -13,11 +17,41 @@ export default function OnboardingPage() {
   });
   const navigate = useNavigate();
 
-  const handleNext = () => {
-    if (step < 3) setStep(step + 1);
-    else {
-      // Simulate saving and go to dashboard
-      navigate('/dashboard');
+  const handleNext = async () => {
+    if (step < 3) {
+      setStep(step + 1);
+    } else {
+      if (!auth.currentUser) return;
+      setIsSubmitting(true);
+      try {
+        // 1. Save Cafe to Firestore
+        const cafeRef = await addDoc(collection(db, 'cafes'), {
+          ownerId: auth.currentUser.uid,
+          name: formData.name,
+          location: formData.location,
+          industry: formData.industry,
+          theme: formData.theme,
+          slug: formData.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
+          isPremium: false,
+          createdAt: new Date().toISOString()
+        });
+
+        // 2. Send Welcome Email via our Vercel Serverless Function
+        if (auth.currentUser.email) {
+          try {
+             await sendWelcomeEmail(auth.currentUser.email, formData.name);
+          } catch (e) {
+             console.error("Welcome email failed, but cafe was created", e);
+          }
+        }
+
+        // 3. Navigate to Dashboard
+        navigate('/dashboard');
+      } catch (error) {
+        console.error('Error creating cafe:', error);
+        alert('Failed to create your workspace. Please try again.');
+        setIsSubmitting(false);
+      }
     }
   };
 
@@ -165,11 +199,17 @@ export default function OnboardingPage() {
           </button>
           <button 
             onClick={handleNext}
-            disabled={step === 1 && !formData.name}
-            className="btn-primary group h-16 px-10 text-lg disabled:opacity-30"
+            disabled={(step === 1 && !formData.name) || isSubmitting}
+            className="btn-primary group h-16 px-10 text-lg disabled:opacity-30 disabled:cursor-not-allowed flex items-center justify-center min-w-[200px]"
           >
-            {step === 3 ? 'Launch Workspace' : 'Continue'}
-            <ArrowRight className="ml-3 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+            {isSubmitting ? (
+              <Loader2 className="w-5 h-5 animate-spin" />
+            ) : (
+              <>
+                {step === 3 ? 'Launch Workspace' : 'Continue'}
+                <ArrowRight className="ml-3 w-5 h-5 group-hover:translate-x-1 transition-transform" />
+              </>
+            )}
           </button>
         </div>
       </div>
