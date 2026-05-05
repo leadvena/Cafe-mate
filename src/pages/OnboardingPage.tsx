@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { Coffee, ArrowRight, Check, MapPin, Palette, Sparkles, Loader2 } from 'lucide-react';
@@ -16,6 +16,16 @@ export default function OnboardingPage() {
     theme: 'Artisanal'
   });
   const navigate = useNavigate();
+
+  useEffect(() => {
+    const unsubscribe = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        // If they aren't logged in, kick them back to the login page
+        navigate('/');
+      }
+    });
+    return () => unsubscribe();
+  }, [navigate]);
 
   const handleNext = async () => {
     if (step < 3) {
