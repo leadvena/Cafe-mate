@@ -108,11 +108,11 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-cream flex items-center justify-center">
-        <div className="flex flex-col items-center gap-4">
-          <div className="w-12 h-12 border-4 border-brown-dark/10 border-t-brown-dark rounded-full animate-spin" />
-          <p className="text-sm font-bold uppercase tracking-widest text-brown-dark/40 animate-pulse">Loading Workspace</p>
+      <div className="min-h-screen bg-cream flex flex-col items-center justify-center">
+        <div className="w-24 h-24 mb-6 animate-pulse">
+          <img src="/cafemate.png" alt="CafeMate" className="w-full h-full object-contain" />
         </div>
+        <p className="text-sm font-bold uppercase tracking-widest text-brown-dark/40 animate-pulse">Loading Workspace</p>
       </div>
     );
   }
