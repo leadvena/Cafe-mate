@@ -1,7 +1,7 @@
-import { motion } from 'motion/react';
+import { motion, AnimatePresence } from 'motion/react';
 import { useNavigate } from 'react-router-dom';
 import { QRCodeSVG } from 'qrcode.react';
-import { Edit3, Share2, Download, ExternalLink, Coffee, LogOut, Layout } from 'lucide-react';
+import { Edit3, Share2, Download, ExternalLink, Coffee, LogOut, Layout, ArrowRight, CheckCircle2 } from 'lucide-react';
 import { auth, logOut } from '../services/firebase';
 import { useState, useEffect } from 'react';
 import { db } from '../services/firebase';
@@ -13,6 +13,7 @@ export default function DashboardPage() {
   const navigate = useNavigate();
   const [cafe, setCafe] = useState<Cafe | null>(null);
   const [loading, setLoading] = useState(true);
+  const [copySuccess, setCopySuccess] = useState(false);
 
   useEffect(() => {
     if (!auth.currentUser) return;
@@ -22,14 +23,8 @@ export default function DashboardPage() {
       if (!snapshot.empty) {
         setCafe({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Cafe);
       } else {
-        // Create initial cafe if not exists? For now just mock or navigate to setup
-        setCafe({
-          id: 'initial',
-          ownerId: auth.currentUser?.uid || '',
-          name: 'Your Cozy Cafe',
-          slug: 'your-cozy-cafe',
-          description: 'A beautiful place for coffee.'
-        });
+        // If no cafe found, redirect to onboarding
+        navigate('/onboarding');
       }
       setLoading(false);
     });
@@ -64,157 +59,182 @@ export default function DashboardPage() {
     img.src = 'data:image/svg+xml;base64,' + btoa(svgData);
   };
 
+  const copyToClipboard = () => {
+    navigator.clipboard.writeText(shareUrl);
+    setCopySuccess(true);
+    setTimeout(() => setCopySuccess(false), 2000);
+  };
+
+  if (loading) return null;
+
   return (
-    <div className="min-h-screen bg-cream flex">
-      {/* Sidebar - Desktop */}
-      <aside className="w-64 bg-brown-dark hidden md:flex flex-col p-6 text-cream">
-        <div className="flex items-center gap-3 mb-12">
-          <div className="w-10 h-10 bg-cream rounded-xl flex items-center justify-center">
-            <Coffee className="text-brown-dark w-6 h-6" />
+    <div className="min-h-screen bg-cream flex overflow-hidden">
+      {/* Refined Sidebar */}
+      <aside className="w-24 md:w-80 bg-brown-dark hidden md:flex flex-col p-8 text-cream transition-all border-r border-white/5">
+        <div className="flex items-center gap-4 mb-16">
+          <div className="w-12 h-12 bg-cream rounded-2xl flex items-center justify-center shadow-lg shadow-black/20">
+            <Coffee className="text-brown-dark w-7 h-7" />
           </div>
-          <span className="font-serif text-xl font-bold">CafeMate</span>
+          <span className="font-serif text-2xl font-bold tracking-tight">CafeMate</span>
         </div>
 
-        <nav className="flex-1 space-y-2">
-          <button className="w-full flex items-center gap-3 bg-white/10 p-3 rounded-xl font-medium">
-            <Layout className="w-5 h-5" />
+        <nav className="flex-1 space-y-3">
+          <button className="w-full flex items-center gap-4 bg-white/10 p-4 rounded-[1.5rem] font-bold text-lg">
+            <Layout className="w-6 h-6" />
             Dashboard
           </button>
           <button 
             onClick={() => navigate('/editor')}
-            className="w-full flex items-center gap-3 hover:bg-white/5 p-3 rounded-xl font-medium transition-colors"
+            className="w-full flex items-center gap-4 hover:bg-white/5 p-4 rounded-[1.5rem] font-bold text-lg transition-all text-cream/60 hover:text-cream"
           >
-            <Edit3 className="w-5 h-5" />
+            <Edit3 className="w-6 h-6" />
             Menu Editor
           </button>
         </nav>
 
         <button 
           onClick={handleLogout}
-          className="flex items-center gap-3 text-cream/40 hover:text-cream transition-colors p-3"
+          className="flex items-center gap-4 text-cream/40 hover:text-cream transition-all p-4 font-bold"
         >
-          <LogOut className="w-5 h-5" />
+          <LogOut className="w-6 h-6" />
           Sign Out
         </button>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 p-6 md:p-12 overflow-y-auto">
-        <header className="flex justify-between items-center mb-12">
-           <div>
-              <h1 className="text-4xl font-serif text-brown-dark">Dashboard</h1>
-              <p className="text-text-muted">Welcome back, {auth.currentUser?.displayName?.split(' ')[0]}</p>
+      <main className="flex-1 h-screen overflow-y-auto no-scrollbar pb-24">
+        {/* Header */}
+        <header className="sticky top-0 z-30 px-8 py-8 md:px-12 md:py-10 bg-cream/80 backdrop-blur-xl flex justify-between items-center">
+           <div className="reveal-up" style={{ opacity: 1, transform: 'none' }}>
+              <h1 className="text-4xl md:text-5xl font-serif text-brown-dark">Morning, {auth.currentUser?.displayName?.split(' ')[0] || 'Guest'}</h1>
+              <p className="text-text-muted mt-2 font-medium">Your digital experience is live.</p>
            </div>
-           <div className="md:hidden">
+           <div className="flex items-center gap-4">
               <button 
-                onClick={handleLogout}
-                className="w-10 h-10 bg-brown-dark/5 rounded-full flex items-center justify-center text-brown-dark"
+                onClick={() => window.open(shareUrl, '_blank')}
+                className="hidden md:flex btn-secondary py-3 px-6 text-sm"
               >
-                <LogOut className="w-5 h-5" />
+                <ExternalLink className="w-4 h-4 mr-2" />
+                View Menu
               </button>
+              <div className="md:hidden">
+                <button onClick={handleLogout} className="w-12 h-12 bg-brown-dark/5 rounded-full flex items-center justify-center text-brown-dark">
+                  <LogOut className="w-6 h-6" />
+                </button>
+              </div>
            </div>
         </header>
 
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
-           {/* QR Code Card */}
-           <motion.div 
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="bg-white p-10 rounded-[3rem] shadow-sm border border-brown-dark/5 flex flex-col items-center text-center"
-           >
-              <h2 className="text-2xl font-serif text-brown-dark mb-2">My Menu QR Code</h2>
-              <p className="text-sm text-text-muted mb-8 italic">Your gateway to a beautiful digital experience</p>
-              
-              <div className="bg-cream p-8 rounded-[2rem] mb-8 border border-brown-dark/5">
-                 <QRCodeSVG 
-                  id="qr-code-svg"
-                  value={shareUrl} 
-                  size={200} 
-                  level="H"
-                  includeMargin={false}
-                  imageSettings={{
-                    src: "https://www.google.com/favicon.ico", // Placeholder logo
-                    x: undefined,
-                    y: undefined,
-                    height: 40,
-                    width: 40,
-                    excavate: true,
-                  }}
-                 />
-              </div>
+        <div className="px-8 md:px-12 grid grid-cols-1 xl:grid-cols-12 gap-10">
+           {/* QR Hero Section */}
+           <div className="xl:col-span-7 space-y-10">
+              <motion.div 
+                initial={{ opacity: 0, y: 20 }}
+                animate={{ opacity: 1, y: 0 }}
+                className="card-tactile p-10 md:p-14 flex flex-col items-center text-center relative overflow-hidden"
+              >
+                <div className="absolute top-0 left-0 w-full h-2 bg-green-accent opacity-20" />
+                <h2 className="text-3xl md:text-4xl font-serif text-brown-dark mb-4">The Gateway</h2>
+                <p className="text-text-muted mb-12 max-w-sm mx-auto">This QR code is the bridge between your physical space and your digital artisanal menu.</p>
+                
+                <div className="relative group">
+                  <div className="absolute -inset-8 bg-brown-dark/5 rounded-[3.5rem] scale-95 group-hover:scale-100 transition-transform duration-700" />
+                  <div className="bg-white p-10 rounded-[3rem] shadow-2xl relative z-10 border border-brown-dark/5">
+                     <QRCodeSVG 
+                      id="qr-code-svg"
+                      value={shareUrl} 
+                      size={280} 
+                      level="H"
+                      includeMargin={false}
+                     />
+                  </div>
+                </div>
 
-              <div className="flex gap-4 w-full">
-                 <button 
-                  onClick={downloadQR}
-                  className="flex-1 flex items-center justify-center gap-2 bg-brown-dark text-white py-4 rounded-2xl font-medium hover:bg-brown-mid transition-colors"
-                 >
-                    <Download className="w-5 h-5" />
-                    Download PNG
-                 </button>
-                 <button 
-                  onClick={() => window.print()}
-                  className="px-6 py-4 rounded-2xl border border-brown-dark/10 text-brown-dark hover:bg-brown-dark/5 transition-colors"
-                 >
-                    Print
-                 </button>
-              </div>
-           </motion.div>
+                <div className="flex flex-col md:flex-row gap-4 w-full mt-16 max-w-md">
+                   <button 
+                    onClick={downloadQR}
+                    className="btn-primary flex-1 py-5 shadow-2xl shadow-brown-dark/20"
+                   >
+                      <Download className="w-5 h-5 mr-3" />
+                      Download Assets
+                   </button>
+                   <button 
+                    onClick={() => window.print()}
+                    className="btn-secondary flex-1 py-5"
+                   >
+                      Print for Tables
+                   </button>
+                </div>
+              </motion.div>
 
-           {/* Quick Actions / Preview */}
-           <div className="space-y-8">
-              <div className="bg-brown-dark rounded-[3rem] p-10 text-cream relative overflow-hidden h-full flex flex-col justify-between">
-                 <div className="relative z-10">
-                    <h2 className="text-3xl font-serif mb-4">{cafe?.name}</h2>
-                    <p className="text-cream/60 leading-relaxed mb-8 max-w-sm">
-                       {cafe?.description}
-                    </p>
-                    <div className="flex flex-wrap gap-4">
-                       <button 
-                        onClick={() => navigate('/editor')}
-                        className="bg-cream text-brown-dark px-6 py-3 rounded-full font-medium flex items-center gap-2 hover:bg-white transition-colors"
-                       >
-                          <Edit3 className="w-4 h-4" />
-                          Edit Menu
-                       </button>
-                       <a 
-                        href={`/menu/${cafe?.slug}`}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="bg-white/10 text-cream px-6 py-3 rounded-full font-medium flex items-center gap-2 hover:bg-white/20 transition-colors"
-                       >
-                          <ExternalLink className="w-4 h-4" />
-                          Live Preview
-                       </a>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                <div className="card-tactile p-8 bg-brown-dark text-cream relative overflow-hidden">
+                  <div className="relative z-10">
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-cream/40 block mb-4">Quick Link</span>
+                    <div className="flex items-center justify-between gap-4 bg-white/5 p-4 rounded-2xl border border-white/10">
+                      <span className="text-sm font-medium truncate opacity-60">{shareUrl}</span>
+                      <button onClick={copyToClipboard} className="text-xs font-bold uppercase tracking-widest hover:text-green-accent transition-colors">
+                        {copySuccess ? 'Copied!' : 'Copy'}
+                      </button>
                     </div>
-                 </div>
-                 
-                 <div className="relative z-10 mt-12 bg-white/5 border border-white/10 rounded-2xl p-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3 overflow-hidden">
-                       <Share2 className="w-5 h-5 text-cream/40 flex-shrink-0" />
-                       <span className="text-sm text-cream/60 truncate">{shareUrl}</span>
-                    </div>
-                    <button 
-                      onClick={() => navigator.clipboard.writeText(shareUrl)}
-                      className="text-xs uppercase tracking-widest font-bold text-cream hover:text-white"
-                    >
-                      Copy
-                    </button>
-                 </div>
+                  </div>
+                  <Coffee className="absolute -bottom-10 -right-10 w-40 h-40 text-cream/5 rotate-12" />
+                </div>
 
-                 {/* Decorative background element */}
-                 <Coffee className="absolute -bottom-20 -right-20 w-80 h-80 text-cream/5 rotate-12" />
+                <div className="card-tactile p-8 flex flex-col justify-between">
+                  <div>
+                    <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-brown-dark/40 block mb-4">Analytics</span>
+                    <h3 className="text-4xl font-serif text-brown-dark">128</h3>
+                    <p className="text-sm text-text-muted mt-1">Scans this week</p>
+                  </div>
+                  <div className="flex items-center gap-2 text-green-accent font-bold text-xs mt-6">
+                    <ArrowRight className="w-4 h-4 -rotate-45" />
+                    +12% from last week
+                  </div>
+                </div>
+              </div>
+           </div>
+
+           {/* Preview Column */}
+           <div className="xl:col-span-5">
+              <div className="sticky top-40 flex flex-col items-center">
+                <div className="text-[10px] font-bold uppercase tracking-[0.2em] text-brown-dark/40 mb-8">Live Preview</div>
+                
+                {/* iPhone Mockup */}
+                <div className="relative w-[320px] aspect-[9/19] bg-brown-dark rounded-[3.5rem] p-3 shadow-[0_50px_100px_-20px_rgba(44,26,14,0.3)] border-[8px] border-brown-dark">
+                  <div className="absolute top-0 left-1/2 -translate-x-1/2 w-32 h-6 bg-brown-dark rounded-b-2xl z-20" />
+                  <div className="w-full h-full bg-cream rounded-[2.5rem] overflow-hidden relative">
+                    <iframe 
+                      src={shareUrl} 
+                      className="w-full h-full border-none"
+                      title="Menu Preview"
+                    />
+                  </div>
+                </div>
+
+                <button 
+                  onClick={() => navigate('/editor')}
+                  className="mt-10 btn-primary px-10 shadow-xl shadow-brown-dark/20"
+                >
+                  <Edit3 className="w-5 h-5 mr-3" />
+                  Customize Menu
+                </button>
               </div>
            </div>
         </div>
 
-        <section className="mt-16">
-           <div className="flex justify-between items-center mb-8">
-              <h3 className="text-2xl font-serif text-brown-dark">Setup Progress</h3>
-           </div>
-           <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-              <ProgressCard title="Account Verified" completed />
-              <ProgressCard title="Cafe Profile" completed />
-              <ProgressCard title="Add 5+ Menu Items" completed={false} />
+        {/* Progress Footer */}
+        <section className="mt-24 px-8 md:px-12">
+           <div className="max-w-4xl mx-auto">
+             <div className="flex justify-between items-center mb-8">
+                <h3 className="text-2xl font-serif text-brown-dark">Your Setup Journey</h3>
+                <span className="text-sm font-bold text-brown-dark/40">2 / 3 Steps Completed</span>
+             </div>
+             <div className="space-y-4">
+                <ProgressItem title="Artisanal Cafe Profile" completed />
+                <ProgressItem title="Digital Menu Curated" completed />
+                <ProgressItem title="Print & Launch Experience" completed={false} />
+             </div>
            </div>
         </section>
       </main>
@@ -222,16 +242,25 @@ export default function DashboardPage() {
   );
 }
 
-function ProgressCard({ title, completed }: { title: string; completed: boolean }) {
+function ProgressItem({ title, completed }: { title: string; completed: boolean }) {
   return (
-    <div className="bg-white p-6 rounded-3xl border border-brown-dark/5 flex items-center justify-between">
-       <span className="font-medium text-brown-dark">{title}</span>
-       <div className={cn(
-         "w-6 h-6 rounded-full flex items-center justify-center",
-         completed ? "bg-green-accent text-white" : "border-2 border-brown-dark/10"
-       )}>
-          {completed && <div className="w-2 h-2 bg-white rounded-full" />}
+    <div className={cn(
+      "p-6 rounded-[2rem] border transition-all flex items-center justify-between group",
+      completed ? "bg-white border-brown-dark/5" : "bg-white/40 border-dashed border-brown-dark/10"
+    )}>
+       <div className="flex items-center gap-4">
+          <div className={cn(
+            "w-10 h-10 rounded-full flex items-center justify-center transition-colors",
+            completed ? "bg-green-accent text-white" : "bg-brown-dark/5 text-brown-dark/20"
+          )}>
+             {completed ? <CheckCircle2 className="w-6 h-6" /> : <div className="w-2 h-2 bg-current rounded-full" />}
+          </div>
+          <span className={cn(
+            "font-bold tracking-tight",
+            completed ? "text-brown-dark" : "text-brown-dark/40"
+          )}>{title}</span>
        </div>
+       {!completed && <ArrowRight className="w-5 h-5 text-brown-dark/20 group-hover:text-brown-dark group-hover:translate-x-1 transition-all" />}
     </div>
   );
 }
