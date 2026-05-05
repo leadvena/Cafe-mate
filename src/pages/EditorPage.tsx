@@ -92,15 +92,22 @@ export default function EditorPage() {
 
   // Load Cafe
   useEffect(() => {
-    if (!auth.currentUser) return;
-    const q = query(collection(db, 'cafes'), where('ownerId', '==', auth.currentUser.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        setCafe({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Cafe);
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        navigate('/');
+        return;
       }
+      const q = query(collection(db, 'cafes'), where('ownerId', '==', user.uid));
+      const unsubscribeDb = onSnapshot(q, (snapshot) => {
+        if (!snapshot.empty) {
+          setCafe({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Cafe);
+        }
+      });
+      return () => unsubscribeDb();
     });
-    return () => unsubscribe();
-  }, []);
+    
+    return () => unsubscribeAuth();
+  }, [navigate]);
 
   // Load Categories
   useEffect(() => {

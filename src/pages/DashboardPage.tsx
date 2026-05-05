@@ -20,21 +20,28 @@ export default function DashboardPage() {
   const [isSubmittingUpgrade, setIsSubmittingUpgrade] = useState(false);
 
   useEffect(() => {
-    if (!auth.currentUser) return;
-
-    const q = query(collection(db, 'cafes'), where('ownerId', '==', auth.currentUser.uid));
-    const unsubscribe = onSnapshot(q, (snapshot) => {
-      if (!snapshot.empty) {
-        setCafe({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Cafe);
-      } else {
-        // If no cafe found, redirect to onboarding
-        navigate('/onboarding');
+    const unsubscribeAuth = auth.onAuthStateChanged((user) => {
+      if (!user) {
+        navigate('/');
+        return;
       }
-      setLoading(false);
+
+      const q = query(collection(db, 'cafes'), where('ownerId', '==', user.uid));
+      const unsubscribeDb = onSnapshot(q, (snapshot) => {
+        if (!snapshot.empty) {
+          setCafe({ id: snapshot.docs[0].id, ...snapshot.docs[0].data() } as Cafe);
+        } else {
+          // If no cafe found, redirect to onboarding
+          navigate('/onboarding');
+        }
+        setLoading(false);
+      });
+
+      return () => unsubscribeDb();
     });
 
-    return () => unsubscribe();
-  }, []);
+    return () => unsubscribeAuth();
+  }, [navigate]);
 
   const handleLogout = async () => {
     await logOut();
@@ -99,7 +106,16 @@ export default function DashboardPage() {
     }
   };
 
-  if (loading) return null;
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-cream flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-brown-dark/10 border-t-brown-dark rounded-full animate-spin" />
+          <p className="text-sm font-bold uppercase tracking-widest text-brown-dark/40 animate-pulse">Loading Workspace</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-cream flex overflow-hidden">
