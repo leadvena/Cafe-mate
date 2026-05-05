@@ -106,8 +106,8 @@ export default function DashboardPage() {
       {/* Refined Sidebar */}
       <aside className="w-24 md:w-80 bg-brown-dark hidden md:flex flex-col p-8 text-cream transition-all border-r border-white/5">
         <div className="flex items-center gap-4 mb-16">
-          <div className="w-12 h-12 bg-cream rounded-2xl flex items-center justify-center shadow-lg shadow-black/20">
-            <Coffee className="text-brown-dark w-7 h-7" />
+          <div className="w-12 h-12 bg-cream rounded-2xl flex items-center justify-center shadow-lg shadow-black/20 p-2.5">
+            <img src="/favicon.svg" alt="CafeMate Logo" className="w-full h-full object-contain brightness-0" />
           </div>
           <span className="font-serif text-2xl font-bold tracking-tight">CafeMate</span>
         </div>

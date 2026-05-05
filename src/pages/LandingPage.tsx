@@ -48,8 +48,8 @@ export default function LandingPage() {
       >
         <div className="nav-pill glass-pill px-6 md:px-8 py-3 md:py-4 flex justify-between items-center rounded-full border border-brown-dark/10 shadow-2xl">
           <div className="flex items-center gap-2 md:gap-3">
-            <div className="w-8 h-8 md:w-10 md:h-10 bg-brown-dark rounded-xl flex items-center justify-center shadow-lg">
-              <Coffee className="text-cream w-5 h-5 md:w-6 md:h-6" />
+            <div className="w-8 h-8 md:w-10 md:h-10 bg-brown-dark rounded-xl flex items-center justify-center shadow-lg p-2">
+              <img src="/favicon.svg" alt="CafeMate Logo" className="w-full h-full object-contain brightness-0 invert" />
             </div>
             <span className="font-serif text-xl md:text-2xl font-bold tracking-tighter text-brown-dark">CafeMate</span>
           </div>
@@ -398,8 +398,8 @@ export default function LandingPage() {
         <div className="max-w-7xl mx-auto grid grid-cols-1 md:grid-cols-4 gap-20">
           <div className="col-span-2 space-y-8">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-brown-dark rounded-xl flex items-center justify-center">
-                <Coffee className="text-cream w-7 h-7" />
+              <div className="w-12 h-12 bg-brown-dark rounded-xl flex items-center justify-center p-2.5">
+                <img src="/favicon.svg" alt="CafeMate Logo" className="w-full h-full object-contain brightness-0 invert" />
               </div>
               <span className="font-serif text-3xl font-bold tracking-tighter text-brown-dark">CafeMate</span>
             </div>

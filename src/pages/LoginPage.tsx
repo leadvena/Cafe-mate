@@ -33,9 +33,9 @@ export default function LoginPage() {
           <div className="flex flex-col items-center mb-10 text-center">
             <motion.div 
               whileHover={{ rotate: 10, scale: 1.1 }}
-              className="w-20 h-20 bg-brown-dark rounded-3xl flex items-center justify-center mb-8 shadow-xl shadow-brown-dark/20"
+              className="w-20 h-20 bg-brown-dark rounded-3xl flex items-center justify-center mb-8 shadow-xl shadow-brown-dark/20 p-4"
             >
-              <Coffee className="text-cream w-10 h-10" />
+              <img src="/favicon.svg" alt="CafeMate Logo" className="w-full h-full object-contain brightness-0 invert" />
             </motion.div>
             <h1 className="text-4xl font-serif text-brown-dark mb-3">Welcome Back</h1>
             <p className="text-text-muted text-balance px-4">Sign in to your artisanal dashboard and manage your digital experience.</p>
