@@ -109,7 +109,7 @@ export default function DashboardPage() {
   if (loading) {
     return (
       <div className="min-h-screen bg-cream flex flex-col items-center justify-center">
-        <div className="w-24 h-24 mb-6 animate-pulse">
+        <div className="w-40 h-40 mb-8 animate-pulse">
           <img src="/cafemate.png" alt="CafeMate" className="w-full h-full object-contain" />
         </div>
         <p className="text-sm font-bold uppercase tracking-widest text-brown-dark/40 animate-pulse">Loading Workspace</p>
