@@ -1,18 +1,25 @@
-import { ref, uploadBytes, getDownloadURL } from 'firebase/storage';
-import { storage, auth } from './firebase';
+export async function uploadImage(file: File): Promise<string> {
+  const form = new FormData();
+  form.append('image', file);
 
-export async function uploadImage(file: File, path: string): Promise<string> {
-  if (!auth.currentUser) throw new Error('Unauthorized');
-  
-  const storageRef = ref(storage, `users/${auth.currentUser.uid}/${path}/${Date.now()}-${file.name}`);
-  const snapshot = await uploadBytes(storageRef, file);
-  return await getDownloadURL(snapshot.ref);
+  const response = await fetch('/api/upload-image', {
+    method: 'POST',
+    body: form,
+  });
+
+  if (!response.ok) {
+    const err = await response.text();
+    throw new Error(`Image upload failed: ${err}`);
+  }
+
+  const { url } = await response.json();
+  return url;
 }
 
 export async function uploadCafeLogo(file: File): Promise<string> {
-  return uploadImage(file, 'logos');
+  return uploadImage(file);
 }
 
 export async function uploadMenuItemImage(file: File): Promise<string> {
-  return uploadImage(file, 'menu-items');
+  return uploadImage(file);
 }
