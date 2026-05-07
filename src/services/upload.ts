@@ -1,19 +1,17 @@
-export async function uploadImage(file: File): Promise<string> {
-  const form = new FormData();
-  form.append('image', file);
+import { upload } from '@vercel/blob/client';
 
-  const response = await fetch('/api/upload-image', {
-    method: 'POST',
-    body: form,
+/**
+ * Upload an image directly to Vercel Blob from the browser.
+ * The file goes straight from the client to Blob storage,
+ * bypassing the 4.5 MB serverless function body limit.
+ */
+export async function uploadImage(file: File): Promise<string> {
+  const blob = await upload(file.name, file, {
+    access: 'public',
+    handleUploadUrl: '/api/upload-image',
   });
 
-  if (!response.ok) {
-    const err = await response.text();
-    throw new Error(`Image upload failed: ${err}`);
-  }
-
-  const { url } = await response.json();
-  return url;
+  return blob.url;
 }
 
 export async function uploadCafeLogo(file: File): Promise<string> {

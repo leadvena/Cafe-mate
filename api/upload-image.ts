@@ -1,12 +1,5 @@
+import { handleUpload, type HandleUploadBody } from '@vercel/blob/client';
 import type { VercelRequest, VercelResponse } from '@vercel/node';
-import { put } from '@vercel/blob';
-
-// Disable body parsing, we'll use the built‑in form handling.
-export const config = {
-  api: {
-    bodyParser: false,
-  },
-};
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
   if (req.method !== 'POST') {
@@ -14,18 +7,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     return res.status(405).send('Method Not Allowed');
   }
 
-  // Vercel's Node runtime provides a "files" property on the request when using multipart/form-data.
-  // If not, you can use a library like "formidable"; for simplicity we assume the file arrives as req.files.image.
-  const file = (req as any).files?.image;
-  if (!file) {
-    return res.status(400).json({ error: 'No image file provided' });
-  }
-
   try {
-    const blob = await put(file.name, file, { access: 'public' });
-    return res.status(200).json({ url: blob.url });
-  } catch (e) {
-    console.error('Blob upload error', e);
-    return res.status(500).json({ error: 'Upload failed' });
+    const body = req.body as HandleUploadBody;
+
+    const jsonResponse = await handleUpload({
+      body,
+      request: req,
+      onBeforeGenerateToken: async () => {
+        // Restrict to image types only
+        return {
+          allowedContentTypes: [
+            'image/jpeg',
+            'image/png',
+            'image/gif',
+            'image/webp',
+            'image/svg+xml',
+          ],
+          maximumSizeInBytes: 10 * 1024 * 1024, // 10 MB max
+        };
+      },
+      onUploadCompleted: async ({ blob }) => {
+        console.log('Upload completed:', blob.url);
+      },
+    });
+
+    return res.status(200).json(jsonResponse);
+  } catch (error) {
+    console.error('Upload handler error:', error);
+    return res.status(400).json({
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
   }
 }
