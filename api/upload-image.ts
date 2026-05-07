@@ -30,7 +30,6 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
 
     // Stream the raw request body directly to Vercel Blob
     const blob = await put(filename, req, {
-      access: 'public',
       contentType,
     });
 
